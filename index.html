@@ -1,0 +1,207 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Clock, PlusCircle, Moon, Sun, Info, Trash2 } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+const AverageTimeCalculator = () => {
+  const [times, setTimes] = useState(['', '', '', '', '']);
+  const [average, setAverage] = useState('00:00');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const inputRefs = useRef([]);
+
+  useEffect(() => {
+    calculateAverage();
+    // Save times to localStorage
+    localStorage.setItem('savedTimes', JSON.stringify(times));
+  }, [times]);
+
+  useEffect(() => {
+    // Load saved times from localStorage
+    const savedTimes = localStorage.getItem('savedTimes');
+    if (savedTimes) {
+      setTimes(JSON.parse(savedTimes));
+    }
+    
+    // Load saved theme from localStorage
+    const savedTheme = localStorage.getItem('isDarkMode');
+    if (savedTheme !== null) {
+      setIsDarkMode(JSON.parse(savedTheme));
+    }
+  }, []);
+
+  const addNewTime = () => {
+    setTimes([...times, '']);
+    setTimeout(() => {
+      inputRefs.current[times.length].focus();
+    }, 0);
+  };
+
+  const handleTimeChange = (index, value) => {
+    const newTimes = [...times];
+    newTimes[index] = value;
+    setTimes(newTimes);
+  };
+
+  const formatTime = (value) => {
+    const numbers = value.replace(/\D/g, '');
+    const minutes = numbers.slice(0, 2).padStart(2, '0');
+    const seconds = numbers.slice(2, 4).padStart(2, '0');
+    return `${minutes}:${seconds}`;
+  };
+
+  const handleInputBlur = (index, value) => {
+    const formattedValue = value ? formatTime(value) : '';
+    const newTimes = [...times];
+    newTimes[index] = formattedValue;
+    setTimes(newTimes);
+  };
+
+  const handleKeyDown = (e, index) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const formattedValue = formatTime(times[index]);
+      const newTimes = [...times];
+      newTimes[index] = formattedValue;
+      setTimes(newTimes);
+      if (index < times.length - 1) {
+        inputRefs.current[index + 1].focus();
+      } else {
+        addNewTime();
+      }
+    }
+  };
+
+  const removeTime = (index) => {
+    const newTimes = times.filter((_, i) => i !== index);
+    setTimes(newTimes);
+  };
+
+  const calculateAverage = () => {
+    const validTimes = times.filter(time => time.match(/^\d{2}:\d{2}$/));
+    if (validTimes.length === 0) {
+      setAverage('00:00');
+      return;
+    }
+
+    let totalSeconds = 0;
+    validTimes.forEach(time => {
+      const [minutes, seconds] = time.split(':').map(Number);
+      totalSeconds += minutes * 60 + seconds;
+    });
+    const averageSeconds = Math.round(totalSeconds / validTimes.length);
+    const averageMinutes = Math.floor(averageSeconds / 60);
+    const remainingSeconds = averageSeconds % 60;
+    setAverage(`${String(averageMinutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`);
+  };
+
+  const toggleTheme = () => {
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    localStorage.setItem('isDarkMode', JSON.stringify(newDarkMode));
+  };
+
+  const getCalculationSteps = () => {
+    const validTimes = times.filter(time => time.match(/^\d{2}:\d{2}$/));
+    if (validTimes.length === 0) return "No valid times entered.";
+
+    let totalSeconds = 0;
+    const steps = validTimes.map((time, index) => {
+      const [minutes, seconds] = time.split(':').map(Number);
+      const timeInSeconds = minutes * 60 + seconds;
+      totalSeconds += timeInSeconds;
+      return `${index + 1}. ${time} = ${timeInSeconds} seconds`;
+    });
+
+    const averageSeconds = Math.round(totalSeconds / validTimes.length);
+    const averageMinutes = Math.floor(averageSeconds / 60);
+    const remainingSeconds = averageSeconds % 60;
+
+    steps.push(`Total seconds: ${totalSeconds}`);
+    steps.push(`Average seconds: ${totalSeconds} / ${validTimes.length} = ${averageSeconds}`);
+    steps.push(`Final average: ${String(averageMinutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`);
+
+    return steps.join('\n');
+  };
+
+  return (
+    <div className={`min-h-screen p-4 transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-black'}`}>
+      <Card className={`max-w-md mx-auto ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center">
+              <Clock className="mr-2" />
+              Average Time Calculator
+            </span>
+            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+              {isDarkMode ? <Sun /> : <Moon />}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+            {times.map((time, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <Input
+                  ref={el => inputRefs.current[index] = el}
+                  type="text"
+                  value={time}
+                  onChange={(e) => handleTimeChange(index, e.target.value)}
+                  onBlur={(e) => handleInputBlur(index, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  placeholder="00:00"
+                  className={`w-full ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-100'}`}
+                />
+                <Button variant="ghost" size="icon" onClick={() => removeTime(index)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-between items-center">
+            <Button onClick={addNewTime} className="flex items-center">
+              <PlusCircle className="mr-2" />
+              Add Time
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="flex items-center">
+                  <Info className="mr-2" />
+                  Info
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Calculation Steps</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    <pre className="whitespace-pre-wrap">{getCalculationSteps()}</pre>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogAction>Close</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+          <Alert className={`mt-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+            <AlertTitle>Average Time</AlertTitle>
+            <AlertDescription>{average}</AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default AverageTimeCalculator;
